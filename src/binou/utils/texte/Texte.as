@@ -1,0 +1,456 @@
+﻿package com.lagoon.utils.texte
+{
+	import mx.formatters.DateFormatter;
+	import mx.validators.DateValidator;
+	
+	/**
+	 * Ensemble de fonctions Statiques de mise en forme et de verification de champs textes
+	 *
+	 * @author Benjamin BOUFFIER
+	 **/
+	public class Texte
+	{
+		/** @private **/
+		private static var emailModele		:RegExp = /^[-_a-z0-9][-._a-z0-9]*@([a-z0-9][-_a-z0-9]*\.)+[a-z]{2,6}$/
+		private static var emailModeleGroup	:RegExp = /(?P<name>(\w|[_.\-])+)@(?P<dom>((\w|-)+))+\.\w{2,6}+/; 
+		
+		/**
+		 * Remplace les " par des \".
+		 *
+		 * @param value Texte à mettre sous cette forme.
+		 * @return Le texte formatté.
+		 *
+		 **/
+		public static function addSlashes( value:String ):String
+		{
+			var myPattern:RegExp = /"/g;
+			var retour:String = value;
+			try
+			{
+				retour = value.replace( myPattern, '\\"' );
+			}
+			catch( e:Error )
+			{
+				trace(e);
+			}
+			return retour;
+		}
+		
+		/**
+		 * Remplace les \" par des ".
+		 *
+		 * @param value Texte à mettre sous cette forme.
+		 * @return Le texte formatté.
+		 *
+		 **/
+		public static function stripSlashes( value:String ):String
+		{
+			var retour:String = value;
+			var myPattern:RegExp = /\"/g;
+			try
+			{
+				retour = value.replace(myPattern, '"');
+			}
+			catch( e:Error )
+			{
+				trace(e);
+			}
+			return retour;
+		}
+		
+		/**
+		 * Met la chaine en MAJUSCULE
+		 *
+		 * @param value Texte à mettre sous cette forme.
+		 * @return Le texte formatté.
+		 *
+		 **/
+		public static function toMAJ( value:String ):String
+		{
+			var retour:String = value.toUpperCase();
+			return retour;
+		}
+		
+		/**
+		 * Met la premiere lettre de chaque mot en majuscule et les suivantes en minuscule
+		 *
+		 * @param value Texte à mettre sous cette forme.
+		 * @return Le texte formatté.
+		 *
+		 **/
+		public static function toNom( value:String ):String
+		{
+			var mots:Array = value.split( ' ' );
+			var s:String;
+			for( var i:int = 0; i< mots.length; i++ )
+			{
+				s = mots[i];
+				mots[i] = s.substr(0, 1).toLocaleUpperCase() + s.substring(1, s.length).toLocaleLowerCase();
+			}
+			var retour:String = mots.join( ' ' );
+			return retour;
+		}
+		
+		/**
+		 * Verifie la presence du "&#64;" et du "." dans une adresse email
+		 *
+		 * @see #verifieEmail()
+		 * @param value Adresse email à verifier.
+		 * @return <ul> <li> Vrai si l'adresse contient le "&#64;" et le ".". </li>
+		 * 				<li> Faux sinon. </li></ul>
+		 *
+		 **/
+		public static function verifMail( value:String ):Boolean
+		{
+			if ( value.indexOf("@") == -1 || value.indexOf(".") == -1 ) 	return false;
+			else															return true;
+		}
+		
+		/**
+		 * Verifie la presence du "&#64;" et du "." dans une adresse email avec regExp
+		 *
+		 * @see #verifMail()
+		 * @param pEmail Adresse email à verifier.
+		 * @return <ul> <li> Vrai si l'adresse contient le "&#64;" et le ".". </li>
+		 * 				<li> Faux sinon. </li></ul>
+		 *
+		 **/
+		public static function verifieEmail( pEmail:String, domainsDenied:Array = null ):uint
+		{
+			var resultat:Array = pEmail.match( Texte.emailModele );
+			
+			if( !resultat ) return 1;
+			else if( domainsDenied )
+			{
+				var result:Array = emailModeleGroup.exec(pEmail);
+				for( var i:int = 0; i<domainsDenied.length; i++ )
+				{
+					if( String(result.dom).toLowerCase() == String(domainsDenied[i]).toLowerCase() ) return 2;
+				}
+			}
+			
+			return 0;
+		}
+		
+		
+		/**
+		 * Verifie que la chaine contien uniquement des valeur numériques
+		 *
+		 * @param value Chaine à verifier.
+		 * @return <ul> <li> Vrai si tout les caractères sont numériques. </li>
+		 * 				<li> Faux sinon. </li></ul>
+		 *
+		 **/
+		public static function isNumeric( value:String ):Boolean
+		{
+			var e:String;
+			for(var i:int = 0; i< value.length; i++)
+			{
+				var n:Number = Number(value.charAt(i));
+				e = String(n);
+				if(e == "NaN")
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		
+		/**
+		 * Verifie que la chaine contien uniquement des valeur numériques et/ou une virgule
+		 *
+		 * @param value Chaine à verifier.
+		 * @return <ul> <li> Vrai si tout les caractères sont numériques. </li>
+		 * 				<li> Faux sinon. </li></ul>
+		 *
+		 **/
+		public static function isNumber( value:String ):Boolean
+		{
+			var e:String;
+			var point:int = 0;
+			
+			for(var i:int = 0; i< value.length; i++)
+			{
+				if( value.charAt(i) == "." && point < 1 )
+				{
+					point++;
+				}
+				else
+				{
+					var n:Number = Number(value.charAt(i));
+					e = String(n);
+					if(e == "NaN")
+					{
+						return false;
+					}
+				}
+			}
+			return true;
+		}
+		
+		/**
+		 * Verifie que la chaine contien uniquement des valeur numériques et 4 caracteres
+		 * si la variable inf est sur true verifie que l'année est inferieure a l'année en cours
+		 *
+		 * @param value Chaine à verifier.
+		 * @param inf Limite à l'année en cours ou inferieure.
+		 * @return <ul> <li> Vrai si c'est bien une année. </li>
+		 * 				<li> Faux sinon. </li></ul>
+		 *
+		 **/
+		public static function isAnnee( value:String, inf:Boolean = false ):Boolean
+		{
+			//verification de la longueur
+			if( value.length != 4 )	return false;
+			
+			//verification numérique
+			if( !Texte.isNumeric( value ) )	return false;
+			
+			//verification que ca dépasse pas l'année en cours
+			if( inf )
+			{
+				var date:Date = new Date();
+				var annee:Number = date.getFullYear();
+				
+				if( Number(value) > annee )	return false;
+			}
+			
+			return true;
+		}
+		
+		
+		/**
+		 * Verifie que la chaine contien un numéro de téléphone francais valide
+		 *
+		 * @param value Chaine à verifier.
+		 * @return <ul> <li> Vrai si c'est bien une chaine de 10 nombres. </li>
+		 * 				<li> Faux sinon. </li></ul>
+		 *
+		 **/
+		public static function isTelFr( value:String ):Boolean
+		{
+			//verification de la longueur
+			if( value.length != 10 )	return false;
+			
+			//verification numérique
+			if( !isNumeric( value ) )	return false;
+			
+			return true;
+		}
+		
+		/**
+		 * DateFormatter
+		 * */
+		public static function dateFormat( date:String, format:String ):String
+		{
+			var f:DateFormatter = new DateFormatter();
+			f.formatString = format;
+			return f.format(date);
+		}
+		
+		/**
+		 * DateValidator
+		 * 
+		 * @param date le texte correspondant à la date a vérifier
+		 * @param format le format de la date à vérifier (JJ/MM/AA ou YYYY-MM-DD par exemple)
+		 * <ul>
+		 * 	<li>pour les jours les valeurs acceptées sont JJ ou DD </li>
+		 *  <li>pour les mois la valeur acceptée est MM </li>
+		 *  <li>pour les années les valeurs acceptées sont AA, YY, AAAA ou YYYY </li>
+		 * </ul>
+		 * @param y2kOffset la valeur à partir de laquelle on passe en 19xx quand on vérifie l'année à 2 digits.<br />
+		 * Par exemple y2kOffset=12, si l'année est de type 12/12/10 alors on sera en 2010 par contre si 12/12/12 alors on est en 1912.
+		 * 
+		 * @return un entier correspondant au résultat<br />
+		 * <ul>
+		 * 	<li>0: verification ok</li>
+		 * 	<li>1: mauvais séparateur ou séparateur manquant</li>
+		 *  <li>2: date trop courte / don't match format</li>
+		 *  <li>3: jour érroné, inférieur à 0 ou supérieur à 31 ou trop court</li>
+		 *  <li>4: mois érroné, inférieur à 0 ou supérieur à 12 ou trop court</li>
+		 *  <li>5: année érroné, inférieur à 0 ou trop court</li>
+		 *  <li>6: date innexistante</li>
+		 * </ul> 
+		 * */
+		public static function isDate( date:String, format:String = 'DD/MM/YYYY', y2kOffset:int = 30 ):int
+		{
+			var day			:String;
+			var month		:String;
+			var year		:String;
+			
+			var _daylength	:int		= 0;
+			var _monthlength:int		= 0;
+			var _yearlength	:int		= 0;
+			
+			var _daypos		:int 		= -1;
+			var _monthpos	:int 		= -1;
+			var _yearpos	:int 		= -1;
+			var _fspos		:int 		= -1;
+			var _sspos		:int 		= -1;
+			
+			var _firstSep	:String 	= '';
+			var _secondSep	:String 	= '';
+			var s:String;
+			
+			// vérifier la longeur
+			if( date.length != format.length )	return 2;
+			
+			// strip the format and find required elements
+			var l:int = format.length;
+			for( var e:uint = 0; e<l; e++ )
+			{
+				if( format.toLowerCase().charAt(e) == 'j' )	format = format.substr(0,e)+'D'+format.substr(e+1);
+				if( format.toLowerCase().charAt(e) == 'a' )	format = format.substr(0,e)+'Y'+format.substr(e+1);;
+				
+				if( format.toLowerCase().charAt(e) == 'd' )
+				{
+					++_daylength;
+					if( _daypos == -1 )
+						_daypos = e;
+				}
+				else if( format.toLowerCase().charAt(e) == 'm' )
+				{
+					++_monthlength;
+					if( _monthpos == -1 )
+						_monthpos = e;
+				}
+				else if( format.toLowerCase().charAt(e) == 'y' )
+				{
+					++_yearlength;
+					if( _yearpos == -1 )
+						_yearpos = e;
+				}
+				else
+				{
+					if( !_firstSep )	
+					{
+						_firstSep = format.charAt(e);
+						_fspos = e;
+					}
+					else				
+					{
+						_secondSep = format.charAt(e);
+						_sspos = e;
+					}
+				}
+			}
+			
+			//vérification de la présence des séparateur
+			if( (_firstSep && date.charAt(_fspos) != _firstSep) || (_secondSep && date.charAt(_sspos) != _secondSep) )		
+			{
+				return 1;
+			}
+			
+			// définition des éléments de la date
+			if( _daylength > 0 ) 	
+			{
+				day = date.substr(_daypos, _daylength);
+				if( day.length < _daylength || int(day) < 0 || int(day) > 31 )			
+				{
+					return 3;
+				}
+			}
+			if( _monthlength > 0 ) 	
+			{
+				month = date.substr(_monthpos, _monthlength);
+				if( month.length < _monthlength || int(month) < 0 || int(month) > 12  )		
+				{
+					return 4;
+				}
+			}
+			if( _yearlength > 0 ) 	
+			{
+				year = date.substr(_yearpos, _yearlength);
+				if( year.length < _yearlength || int(year) < 0 )			
+				{
+					return 5;
+				}
+			}
+			
+			if( year.length == 2 )
+			{
+				if( int(year) < y2kOffset )	year = '20'+year;
+				else						year = '19'+year;
+			}
+			
+			var _date:Date = new Date( year, (int(month)-1), day );
+			var f:DateFormatter = new DateFormatter();
+			f.formatString = format.toUpperCase();
+			var str:String = f.format( _date );
+			
+			/*var f2:DateFormatter = new DateFormatter();
+			f2.formatString = 'DD/MM/YYYY';
+			var str2:String = f2.format( _date );*/
+			
+			if( str != date )
+			{
+				return 6;
+			}
+			
+			return 0;
+		}
+		
+		/** @private **/
+		private function verifDateElement( value:int, element:String ):Boolean
+		{
+			switch(element)
+			{
+				case 'd':
+					if( int(value) > 0 && int(value) <= 31 )
+						return true;
+					else
+						return false;
+					break;
+				
+				case 'm':
+					if( int(value) > 0 && int(value) <= 12 )
+						return true;
+					else
+						return false;
+					break;
+				
+				case 'y':
+					if( int(value) > 0 )
+						return true;
+					else
+						return false;
+					break;
+			}
+			
+			return false;
+		}
+		
+		/**
+		 * Remove all accents.
+		 */
+		public static function noAccent(source : String) : String
+		{
+			source = source.replace(/[àáâãäå]/g, "a");
+			source = source.replace(/[ÀÁÂÃÄÅ]/g, "A");
+			source = source.replace(/[èéêë]/g, "e");
+			source = source.replace(/[ËÉÊÈ]/g, "E");
+			source = source.replace(/[ìíîï]/g, "i");
+			source = source.replace(/[ÌÍÎÏ]/g, "I");
+			source = source.replace(/[ðòóôõöø]/g, "o");
+			source = source.replace(/[ÐÒÓÔÕÖØ]/g, "O");
+			source = source.replace(/[ùúûü]/g, "u");
+			source = source.replace(/[ÙÚÛÜ]/g, "U");
+			source = source.replace(/[ýýÿ]/g, "y");
+			source = source.replace(/[ÝÝŸ]/g, "Y");
+			source = source.replace(/[ç]/g, "c");
+			source = source.replace(/[Ç]/g, "C");
+			source = source.replace(/[ñ]/g, "n");
+			source = source.replace(/[Ñ]/g, "N");
+			source = source.replace(/[š]/g, "s");
+			source = source.replace(/[Š]/g, "S");
+			source = source.replace(/[ž]/g, "z");
+			source = source.replace(/[Ž]/g, "Z");
+			source = source.replace(/[æ]/g, "ae");
+			source = source.replace(/[Æ]/g, "AE");
+			source = source.replace(/[œ]/g, "oe");
+			source = source.replace(/[Œ]/g, "OE");
+			
+			return source;
+		}
+	}
+}

@@ -1,0 +1,157 @@
+package binou.utils.time
+{
+	import flash.events.*;
+	import flash.utils.*;
+	
+	/** Diffusé lorsque la valeur du timer change. **/
+	[Event(name="change", 			type="flash.events.Event")]
+	
+	/**
+	 * Un timer précis pour faire des compteur / décompteur sans perte de précision due aux ralentissements de l'animation.<br/>
+	 * On peut également changer la fréquence de tic (le nombre de milisecondes entre un tic et le suivant).<br/>
+	 * Ainsi que le temps d'un tic (le nombre de milisecondes a incrementer/décrementer au temps total à chaque tic).
+	 * <br/><br/>
+	 * <strong><em><u>Fonctionnement:</u></em></strong><br/><br/>
+	 * Le RealTimer fonctionne sur un <code>Timer</code>, toutes les 50ms (du <code>Timer</code> -> non précis) 
+	 * on regarde le temps écoulé grace à un <code>getTimer()</code> ( précis ),
+	 * si une fréquence de tic est passée, alors on incremente/décrémente la valeur du timer.
+	 * 
+	 * @author Benjamin BOUFFIER
+	 * */
+	public class RealTimer extends EventDispatcher
+	{
+		
+		/** @private **/
+		protected var _changeEvent		:Event 		= new Event( Event.CHANGE );
+		/** @private **/
+		protected var _time				:Number;				// heure en ms depuis le début unix
+		/** @private **/
+		protected var _isTicking		:Boolean 	= false;	// est ce que ca tourne
+		/** @private **/
+		protected var _tickFrequency	:int		= 1000;		// fréquence du tick
+		/** @private **/
+		protected var _tickDuration		:Number		= 1000;		// durée du tick
+		/** @private **/
+		protected var _regulator		:Timer;					// le timer
+		/** @private **/
+		protected var _regulatorAcc		:int;					// le temps depuis le dernier tick
+		/** @private **/
+		protected var _regulatorCache	:int 		= 0;		// le getTimer au dernier tick
+		/** @private **/
+		protected var _isReverse		:Boolean	= false;	// true si c'est un compte à rebours
+			
+		/**
+		 * Création d'un RealTimer
+		 * */	
+		public function RealTimer():void
+		{
+			super();
+			init();
+		}
+		
+		/**
+		 * Disposer le RealTimer<br/>
+		 * (remove all events)
+		 * */
+		public function dispose():void
+		{
+			_regulator.removeEventListener( TimerEvent.TIMER, onTimerEvent );
+		}
+		
+		// PUBLIC
+		
+		/**
+		 * Définir l'heure à l'heure actuelle
+		 * */
+		public function setRealTimeValue():void 
+		{
+			var d:Date 	= new Date();
+			_time 		= d.valueOf();
+		}
+		
+		/**
+		 * Définir le temps du tick à 1sec et la frequence de tick à 1sec
+		 * */
+		public function setRealTimeTick():void
+		{
+			tickDuration 	= 1000;
+			tickFrequency 	= 1000;
+		}
+		
+		/**
+		 * L'heure UNIX actuelle
+		 * */
+		public function get value():Number	{ return _time; }
+		public function set value( ms:Number ):void 
+		{
+			if (_time != ms )
+			{
+				_time = ms;
+				dispatchEvent( _changeEvent );
+			}
+		}
+		
+		/**
+		 * la durée du tick
+		 * */
+		public function get tickDuration():Number 			{ return _tickDuration; }
+		public function set tickDuration( ms:Number ):void	{ _tickDuration = ms; }
+		
+		/**
+		 * La fréquence de tick
+		 * */
+		public function get tickFrequency():int 			{ return _tickFrequency; }
+		public function set tickFrequency( ms:int ):void	{ _tickFrequency = ms; }
+		
+		/**
+		 * le timer est il un compte à rebours
+		 * */
+		public function get isReverse():Boolean				{ return _isReverse; }
+		public function set isReverse(value:Boolean):void	{ _isReverse = value; }
+		
+		/**
+		 * Démarrer / Areter le Timer
+		 * */
+		public function stopTicking():void					{ _isTicking = false; }
+		public function startTicking():void					{ _isTicking = true; }
+		
+		// POUR LA VERIFICATION DU TEMPS
+		
+		/**
+		 * initialisation du RealTimer:<br/>
+		 * initialisation du régulateur, création et lancement du timer.
+		 * */
+		protected function init():void
+		{
+			_regulatorAcc 	= 0;
+			_regulatorCache = getTimer();
+			_regulator 		= new Timer( 50 );	// mise à jour du regulateur toutes les 50ms
+			_regulator.addEventListener( TimerEvent.TIMER, onTimerEvent );
+			_regulator.start();
+		}
+		
+		/**
+		 * à chaque tic du Timer (toutes les 50ms) on verifie le temps écoulé grace à un getTimer(), 
+		 * si le temps écoulé est égal à la fréquence de tic, on met à jour la valeur du timer.
+		 * */
+		protected function onTimerEvent( event:TimerEvent ):void
+		{
+			var regulatorNew:int 	= getTimer();							// récuperer le timer systeme
+			var regulatorDelta:int 	= regulatorNew - _regulatorCache;		// calculer le temps écoulé depuis le dernier tick (le vrai temps)
+			_regulatorAcc 	   	   += regulatorDelta;						// incrementer l'accumulateur
+			
+			if ( _regulatorAcc > tickFrequency )
+			{
+				// si un temps de tick est passé on met le temps à jour
+				if ( _isTicking == true )	 
+				{
+					if( !_isReverse )	value =  _time + tickDuration;
+					else				value =  _time - tickDuration;
+				}
+				// reset l'accu
+				_regulatorAcc -= tickFrequency;
+			}
+			_regulatorCache = regulatorNew;									// cache previous regulator	value
+		}				
+	}
+}

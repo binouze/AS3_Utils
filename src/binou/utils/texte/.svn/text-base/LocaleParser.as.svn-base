@@ -1,0 +1,446 @@
+package com.lagoon.utils.texte
+{
+	import com.lagoon.interfaces.ILocaleParser;
+	
+	import flash.events.Event;
+	import flash.events.EventDispatcher;
+	import flash.net.URLLoader;
+	import flash.net.URLRequest;
+	import flash.utils.getQualifiedClassName;
+	import flash.utils.getQualifiedSuperclassName;
+	
+	/** Diffusé lorsque les textes changent. **/
+	[Event(name="localeChanged", 	type="flash.events.Event")]
+	
+	/**
+	 * Utils pour charger un fichier texte, le parser et enregistrer des combinaisons clé/valeurs.
+	 * 
+	 * <p>LocaleParser est à utiliser si le projet contient un seul fichier texte à charger. C'est une classe Singleton:
+	 * Pour lancer le chargement d'un fichier utilisez la methode getInstance() pour récupérer l'instance unique 
+	 * du LocaleParser puis utilisez la methode loadLocale(urlOrRequest) pour lancer le chargement,n une fois le fichier parsé, 
+	 * l'évement LOCALE_READY sera diffusé et vous pourrez récupérer les variables chargées grace a la méthode statique 
+	 * LocaleParser.getVar( name ).<br />
+	 * Si votre projet doit charger plusieurs fichiers de locales differents utilisez plutot LocaleParsers, qui n'est pas un Singleton
+	 * et qui n'as pas d'accesseur statique et qui permet donc d'avoir une référence au parseur par fichier chargé. </p>
+	 * 
+	 * <ul>
+	 *  <li>vous pouvez définir le ou les caracteres de début de ligne qui définissent si la ligne sera un commentaire ou  une variable
+	 * avec les variables statiques $startKey et $commentKey</li>
+	 * 	<li>Utilisez la fonction LocaleParser.getInstance().loadLocale( urlOrRequest ) pour charger le fichier texte -> un évènement LOCALE_CHANGED sera diffusé 
+	 * lorsque le fichier aura été chargé et parsé, et que les variables seront accessibles.</li>
+	 * 	<li>Utilisez la fonction statique LocaleParser.getVar( name ) pour récuperer la chaine correspondante à la clé name</li>
+	 * </ul>
+	 * 
+	 * <p><strong><em>Note: Si une ligne du texte ne commence ni par $startKey ni par $commentKey, 
+	 * alors elle sera concaténé à la ligne précédente, 
+	 * si elle est avant la premiere ligne de variable elle sera ignorée</em></strong></p>
+	 * 
+	 * @see com.lagoon.utils.LocaleParsers
+	 * */
+	public class LocaleParser extends EventDispatcher implements ILocaleParser
+	{
+		/** la clé de début de ligne **/
+		//public static const	LOCALE_READY			:String			= "localeReady";
+		/** l'évenement lorsque la locale change **/
+		public static const	LOCALE_CHANGED			:String			= "localeChanged";
+		/** la clé de début de ligne **/
+		public static var	$startKey				:String			= '<|>';
+		/** la clé de commentaire **/
+		public static var	$commentKey				:String			= "##";
+		
+		/** @private **/
+		private static var _$instance				:LocaleParser	= getInstance();	
+		private static var _$vars					:Object;
+		private static var _$url					:String			= "";
+		
+		/** @private **/
+		private var _className						:String 		= getQualifiedClassName( super );
+		/** @private **/
+		private var _loader							:URLLoader;
+		/** @private **/
+		private var _req							:URLRequest;
+		/** @private **/
+		//private var _eventLocaleReady				:Event			= new Event( LOCALE_READY );
+		/** @private **/
+		private var _eventLocaleChanged				:Event			= new Event( LOCALE_CHANGED );
+		
+		/** 
+		 * Récuperer une instance du parser 
+		 * */
+		public static function getInstance():LocaleParser
+		{
+			if( !_$instance )	
+				_$instance = new LocaleParser();
+			return _$instance;
+		}
+		
+		/** @private **/
+		public function LocaleParser()
+		{
+			if ( _$instance != null && getQualifiedSuperclassName( this ) != _className ) 
+				throw new Error("Singleton is obviously... Singleton.");
+		}
+		
+		/** @private **/
+		/*private function _parseLocale( evt:Event ):void
+		{
+			_$vars = {};
+			
+			var str			:String 	= _loader.data+'\r\n#';
+			var newStr		:String 	= str;
+			var lines		:Array 		= []
+			var actualPos	:int 		= 0;
+			var newPos		:int 		= newStr.search( '\r\n' );
+			
+			// variables pour la boucle
+			var line		:String;
+			var cle			:String;
+			var valeur		:String;
+			
+			while( newPos != -1 )
+			{
+				line 		= newStr.substr( 0, newPos );
+				actualPos 	= newPos + 1;
+				newStr 		= newStr.substr( actualPos );
+				newPos 		= newStr.search( '\r\n' );
+				
+				if( !_lineIsComment(line) )		
+				{
+					// si nouvelle variable on l'ajoute sinon on ajoute la ligne à la suite de la ligne précédente
+					if( _lineIsValue(line) )	lines.push( line );
+					else						lines[lines.length-1] = String(lines[lines.length-1]).concat( line );
+				}
+			}
+			
+			var i:int = 0;
+			var l:int = lines.length;
+			for( i=0; i<l; i++ )
+			{
+				if( lines[i].search('=') != -1 )
+				{
+					cle 		= lines[i].substr( 0, lines[i].search('=') );
+					cle 		= cle.replace('\n', '' ).replace('\r', '').replace( $startKey, '' );
+					valeur 		= lines[i].substr( lines[i].search('=')+1 );
+					
+					_$vars[cle] 	= valeur;
+					continue;
+				}
+			}
+			
+			_$url = _req.url;
+			dispatchEvent( _eventLocaleChanged ); 
+		}*/
+		/** @private **/
+		private function _parseLocale( evt:Event ):void
+		{
+			_$vars = {};
+			
+			var str			:String 	= _loader.data+$startKey+'\r\n#';
+			//var lines		:Array 		= [];
+			var actualPos	:int 		= str.indexOf( $startKey ) + $startKey.length;
+			var newStr		:String 	= str.substr( actualPos );
+			var newPos		:int 		= newStr.indexOf( $startKey );
+			
+			var commentPos:int = newStr.indexOf( $commentKey );
+			if( commentPos >= 0  && commentPos  < newPos )		newPos = commentPos;
+			
+			// variables pour la boucle
+			var line		:String;
+			var cle			:String;
+			var valeur		:String;
+			
+			while( newPos != -1 )
+			{
+				line = newStr.substr( 0, newPos );
+				line = removeUnwnatedEnds(line);
+				if( line.search('=') != -1 )
+				{
+					cle 		= line.substr( 0, line.search('=') );
+					cle 		= cle.replace(/\n/g, '' ).replace(/\r/g, '').replace( $startKey, '' );
+					valeur 		= line.substr( line.search('=')+1 );
+					valeur  	= valeur.replace(/\r\n/g, '<br />').replace(/\r/g, '<br />').replace(/\n/g, '<br />').replace(/<BR>/g, '<br />');
+					
+					_$vars[cle] = valeur;
+					
+					//trace( cle + ' -> ' + valeur );
+				}
+				
+				actualPos 	= newPos + $startKey.length;
+				newStr 		= newStr.substr( actualPos );
+				newPos 		= newStr.indexOf( $startKey );
+				
+				commentPos = newStr.indexOf( $commentKey );
+				if( commentPos >= 0  && commentPos  < newPos )		newPos = commentPos;
+			}
+			
+			_$url = _req.url;
+			dispatchEvent( _eventLocaleChanged ); 
+		}
+		
+		/** envoyer des locales déja chargées **/
+		public function setlocales( value:Object, url:String ):void
+		{
+			_$url 	= url;
+			_$vars 	= value;
+			dispatchEvent( _eventLocaleChanged ); 
+		}
+		
+		/** @private **/
+		private function removeUnwnatedEnds( str:String ):String
+		{
+			var stop:int = 0;
+			while( str.charAt( str.length-1 ) == '\r' || str.charAt( str.length-1 ) == '\n' && stop < 10 )
+			{
+				stop++;
+				str = str.substr(0, str.length-1);
+			}
+			return str;
+		}
+		
+		/** @private **/
+		private function _lineIsComment( line:String ):Boolean
+		{
+			if( line.search($commentKey) > -1 && line.search($commentKey) < 2 ) 
+				return true;
+			
+			return false;
+		}
+		/** @private **/
+		private function _lineIsValue( line:String ):Boolean
+		{
+			if( line.search($startKey) > -1 && line.search($startKey) < 2 ) 
+				return true;
+			
+			return false;
+		}
+		
+		
+		/** 
+		 * Charger un fichier de locale 
+		 * */
+		public function loadLocale( urlOrRequest:* ):void
+		{
+			if( urlOrRequest is String )	
+			{
+				if( _req && _req.url == String(urlOrRequest) )	
+					return;
+				_req = new URLRequest( String(urlOrRequest) );
+			}
+			else if( urlOrRequest is URLRequest )
+			{ 
+				if( _req && _req.url == URLRequest(urlOrRequest).url )
+					return;
+				_req = URLRequest(urlOrRequest);
+			}
+			
+			if( _req )	
+			{
+				if(!_loader)	_loader = new URLLoader();
+				_loader.addEventListener( Event.COMPLETE, _parseLocale, false, 0, true );
+				
+				_loader.load( _req );
+			}
+		}
+		
+		/** récuperer le texte corresondant au nom de liaison <code>name</code>**/
+		public static function getVar( name:String ):String
+		{
+			if( name.substr(0,5) == '<<|>>' )	return getConcatVar(name);
+			if( name == 'toto_test' )			return 'toto';
+			if( name == 'html_toto_test' )		return '<b>toto</b>';
+			if( !_$vars )						return '';
+			if( _$vars[name] != null )			return _$vars[name];
+			else								return '';
+		}
+		
+		/** récuperer le texte corresondant au nom de liaison <code>name</code>**/
+		protected static function getConcatVar( name:String ):String
+		{
+			name = name.substr( 5 );
+			
+			var s:String = '';
+			var newpos:int = search(name,'|');
+			var isString:Boolean = true;
+			var i:int = 0;
+			var str:String;
+			
+			while( newpos != -1 && i<100 )
+			{
+				if( isString )	str = getVar( name.substring( 0, newpos++ ) );
+				else			str = name.substring( 0, newpos++ );
+				
+				s += str;
+				name = name.substring( newpos );
+				
+				if( isString )
+					newpos = search(name, '~');
+				else
+					newpos = search(name, '|');
+				
+				isString = !isString;
+				
+				++i;
+			}
+			
+			return s;
+		}
+		
+		/**
+		 * récupérer la localeString correspondant au nom de liaison <code>name</code>
+		 * */
+		public static function getString( name:String ):LocaleString
+		{
+			return new LocaleString( LocaleParser.getInstance(), name );
+		}
+		
+		/** renvoi le fichier de locale au complet **/
+		public static function toString():String
+		{
+			var s:String = "Locales: \n";
+			
+			for( var key:String in _$vars )
+			{
+				s += key + '-> ' + _$vars[key] + '\n';
+			}
+			
+			return s;
+		}
+		
+		/** l'url du fichier chargé **/
+		public static function get url():String
+		{
+			return _$url;
+		}
+		
+		/** récuperer le texte corresondant au nom de liaison <code>name</code>**/
+		public function getVar( name:String ):String
+		{
+			if( name.substr(0,5) == '<<|>>' )	return getConcatVar(name);
+			if( name == 'toto_test' )			return 'toto';
+			if( name == 'html_toto_test' )		return '<b>toto</b>';
+			if( !_$vars )						return '';
+			if( _$vars[name] )					return _$vars[name];
+			else								return '';
+		}
+		
+		private static function search(str:String, pattern:String):int
+		{
+			var i:int = 0;
+			var l:int = str.length;
+			for( i=0; i<l; i++ )
+			{
+				if( str.charAt(i) == pattern ) return i;
+			}
+			return -1;
+		}
+		
+		/** récuperer le texte corresondant au nom de liaison <code>name</code>**/
+		protected function getConcatVar( name:String ):String
+		{
+			name = name.substr( 5 );
+			
+			var s:String = '';
+			var newpos:int = search(name,'|');
+			var isString:Boolean = true;
+			var i:int = 0;
+			var str:String;
+			
+			while( newpos != -1 && i<800 )
+			{
+				if( isString )	str = getVar( name.substring( 0, newpos++ ) );
+				else			str = name.substring( 0, newpos++ );
+				
+				s += str;
+				name = name.substring( newpos );
+				
+				if( isString )
+					newpos = search(name, '~');
+				else
+					newpos = search(name, '|');
+				
+				isString = !isString;
+				
+				++i;
+			}
+			
+			return s;
+		}
+		
+		/**
+		 * récupérer la localeString correspondant au nom de liaison <code>name</code>
+		 * */
+		public function getString( name:String ):LocaleString
+		{
+			return new LocaleString( this, name );
+		}
+		
+		/** l'url du fichier chargé **/
+		public function get url():String
+		{
+			return _$url;
+		}
+		
+		
+		/**
+		 * récupérer la localeStringConcat: <br />
+		 * usage:
+		 * la fonction récupere un tableau de localeVars et un tableau de séparateurs.
+		 * retournera une chaine de type : strings[0]separators[0]strings[1]separators[1]...
+		 * si aucun séparateur n'est définit alors il sear remplacé par la chaine vide ''. 
+		 * */
+		public function getConcatString( strings:Array, separators:Array ):LocaleString
+		{
+			var s:String = '<<|>>';
+			var ls:int = strings.length;
+			var lsep:int = separators.length;
+			for( var i:int = 0; i<strings.length; i++ )
+			{
+				s += strings[i]+'|';
+				if( separators && separators.length > i )
+					s += separators[i]+ '~';
+				else
+					s += '~';
+			}
+			
+			return new LocaleString( this, s );
+		}
+		
+		/**
+		 * récupérer la localeStringConcat: <br />
+		 * usage:
+		 * la fonction récupere un tableau de localeVars et un tableau de séparateurs.
+		 * retournera une chaine de type : strings[0]separators[0]strings[1]separators[1]...
+		 * si aucun séparateur n'est définit alors il sear remplacé par la chaine vide ''. 
+		 * */
+		public static function getConcatString( strings:Array, separators:Array ):LocaleString
+		{
+			var s:String = '<<|>>';
+			var ls:int = strings.length;
+			var lsep:int = separators.length;
+			for( var i:int = 0; i<strings.length; i++ )
+			{
+				s += strings[i]+'|';
+				if( separators && separators.length > i )
+					s += separators[i]+'~';
+				else
+					s += '~';
+			}
+			
+			return new LocaleString( LocaleParser.getInstance(), s );
+		}
+
+		/** @private **/
+		public static function get $vars():Object
+		{
+			return _$vars;
+		}
+
+		/**@private **/
+		public static function get $url():String
+		{
+			return _$url;
+		}
+
+
+	}
+}

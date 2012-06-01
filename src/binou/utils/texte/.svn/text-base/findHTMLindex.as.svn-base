@@ -1,0 +1,50 @@
+package com.lagoon.utils.texte
+{
+	import flash.xml.XMLDocument;
+
+	/**
+	 * Retourne l'index dans un htmlText en y donnant l'index du text.
+	 * Il faut avoir un HTML bien formatté, si il manque des < ou > ca ne marchera pas.
+	 * */
+	public function findHTMLindex( pos:Number, htmlString:String ):int
+	{
+		//htmlString = new XMLDocument(htmlString).firstChild.nodeValue;	// removing html entities
+		
+		// séparer la chaine par bout de balise ex: <font color='#11111'>llalalala</font> -> [["font color='#11111'"]["llalalala"]],[["/font"][""]]
+		var i:int;
+		var tempArr:Array = htmlString.split("<"); 
+		for( i = 0; i<tempArr.length; i++ ) 
+		{ 
+			tempArr[i] = tempArr[i].split(">"); 
+			
+			if( tempArr[i] && tempArr[i][1] )	
+			{
+				trace( "-> in: " + tempArr[i][1] );
+				var l1:int = tempArr[i][1].length;
+				tempArr[i][1] = new XMLDocument(tempArr[i][1]).firstChild.nodeValue;
+				tempArr[i][2] = l1 - tempArr[i][1].length;
+				trace( "-> out: " + tempArr[i][1] );
+				trace( "diff: " + tempArr[i][2] );
+			}
+		} 
+		
+		//supprime le premier element (il est vide)
+		tempArr.shift(); 
+		
+		//trouver la position dans le texte débalisé et ajouter le nombre de caracteres dans les balises pour trouver l'index html
+		var retPos	:int 	= 0; 
+		var posCount:int 	= 0; 
+		for( i = 0; i<tempArr.length; i++) 
+		{ 
+			retPos 		+= tempArr[i][0].length + 2 + tempArr[i][1].length + tempArr[i][2]; 	// incrementer la position HTML -> +2 pour ajouter les < >
+			posCount 	+= tempArr[i][1].length; 												// incrementer la position standard
+			if( posCount > pos )
+			{ 
+				return ( retPos + (pos-posCount) ); 
+			} 
+		} 
+		
+		//out of range 
+		return -1; 
+	}
+}
